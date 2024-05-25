@@ -1,52 +1,39 @@
 const API_KEY = PropertiesService.getScriptProperties().getProperty("API_KEY_FOR_pdf.co")
 const FOLDER = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty("FOLDER_ID"))
-const URL = {
-  "鶴見":"https://yokohama-sport.jp/tsurumi-sc-ysa/userguide",
-  "神奈川":"https://kanagawa-sc.com/default/personalUse/",
-  "中":"https://yokohama-sport.jp/naka-sc-ysa/userguide",
-  "南":"https://www.yokohama-minamisc.jp/personal",
-  "港南":"https://yokohama-sport.jp/konan-sc-ysa/userguide",
-  "保土ケ谷":"https://hodogaya-sports.com/default/personalUse/",
-  "旭":"https://yokohama-sport.jp/asahi-sc-ysa/userguide/",
-  "磯子":"https://yokohama-sport.jp/isogo-sc-ysa/userguide/",
-  "金沢":"https://yokohama-sport.jp/kanazawa-sc-ysa/userguide/",
-  "港北":"https://kohoku-sports.com/default/kojin/",
-  "緑":"https://yokohama-sport.jp/midori-sc-ysa/userguide/",
-  "都筑":"https://yokohama-sport.jp/tsuzuki-sc-ysa/userguide/",
-  "戸塚":"https://yokohama-sport.jp/totsuka-sc-ysa/userguide",
-  "栄":"https://yokohama-sport.jp/sakae-sc-ysa/userguide",
-  "泉":"https://yokohama-sport.jp/izumi-sc-ysa/userguide",
-  "瀬谷":"https://yokohama-sport.jp/seya-sc-ysa/userguide/",
+
+// 各スポーツセンターのURL、予定表のURLを取得する正規表現、予定表のURLが存在する範囲の最初と最後の文字
+const URL_RELATED_DATA ={
+  "港南":['https://yokohama-sport.jp/konan-sc-ysa/userguide','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>','p-blogParts post_content','</div>'],
+  "金沢":['https://yokohama-sport.jp/kanazawa-sc-ysa/userguide/','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>','p-blogParts post_content','</div>'],
+  "戸塚":['https://yokohama-sport.jp/totsuka-sc-ysa/userguide','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>','p-blogParts post_content','</div>'],
+  "栄":['https://yokohama-sport.jp/sakae-sc-ysa/userguide','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>','p-blogParts post_content','</div>'],
+  "鶴見":['https://yokohama-sport.jp/tsurumi-sc-ysa/userguide','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用予定表<\\/a>','p-blogParts post_content','</div>'],
+  "都筑":['https://yokohama-sport.jp/tsuzuki-sc-ysa/userguide/','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月個人利用スケジュール\\(PDF\\)<\\/a>','p-blogParts post_content','</div>'],
+  "泉":['https://yokohama-sport.jp/seya-sc-ysa/userguide/','<a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>','p-blogParts post_content','</div>'],
+  "中":['https://yokohama-sport.jp/naka-sc-ysa/userguide','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月個人利用スケジュール<\\/a>','p-blogParts post_content','</td>'],
+  "磯子":['https://yokohama-sport.jp/isogo-sc-ysa/userguide/','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人スケジュール\\(PDF\\)<\\/a','p-blogParts post_content','</td>'],
+  "緑":['https://yokohama-sport.jp/midori-sc-ysa/userguide/','<a\\s[^>]*href="([^"]*)"[^>]*><span>\\d{4}年([0-9]+)月個人利用日程表<\\/span>','p-blogParts post_content','</td>'],
+  "旭":['https://yokohama-sport.jp/asahi-sc-ysa/userguide/','<a\\s[^>]*href="([^"]*)"[^>]*>☝([0-9]+)月の予定はこちら<\\/a>','p-blogParts post_content','</td>'],
+  "瀬谷":['https://yokohama-sport.jp/izumi-sc-ysa/userguide','<a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>','個人利用ができる日・利用区分は、個人利用スケジュールをご確認ください。','</div>'],
+  "青葉":['https://information.konamisportsclub.jp/trust/aoba/','<a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月度個人利用.*<\\/a>','id="tabs-schedule"','</div>'],
+  "南":['https://www.yokohama-minamisc.jp/personal','<a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月予定<\\/a>','entry-content','</div>'],
 }
-function extractScheduleInfoFromString(text, searched_month) {
-  // 正規表現パターンを定義(リンクと月を取得する,栄スポーツセンター用)
-  var pattern = /<a\s[^>]*href="([^"]*)"[^>]*>(?=.*スケジュール)([0-9]+)月の個人利用スケジュール\(PDF\)<\/a>/g;
-  
-  var matches = [];
+function extractScheduleInfoFromString(text, searched_month, pattern) {
   var match;
-  
-  // パターンにマッチし、月が合う全ての部分文字列を取得
+  // 全角数字もしくは全角括弧を半角に変換する
+  text = text[0].replace(/[０-９（）]/g, function(s) {
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  });
+  // パターンにマッチし、月が合うUrlを取得
   while (match = pattern.exec(text)) {
-    var link = match[1]; // リンクを取得
-    var month = match[2]; // 月の情報を取得
-    if (month == searched_month){
-      matches.push({ month: month, link: link }); // 月とリンクを配列に追加
+    let link = match[1]; // リンクを取得
+    if (match[2] == searched_month){
+      // matches.push({ month: month, link: link }); // 月とリンクを配列に追加
+      return link
     }
   }
-  return matches;
+  return ""
 }
-
-function test(){
-  url = URL["鶴見"]
-  month = 5
-  
-  let response = UrlFetchApp.fetch(url);
-  let content = response.getContentText("utf-8");
-  let text = Parser.data(content).from('p-blogParts post_content').to('</div>').iterate();
-  scheduleInfo = extractScheduleInfoFromString(text, month)
-  console.log(scheduleInfo)
-}
-
 
 function getScheduleImageUrl(year,month, place){
   // 画像がすでに存在しているかを確認して存在している場合にはその画像を返す
@@ -56,21 +43,23 @@ function getScheduleImageUrl(year,month, place){
     return [image.next().getDownloadUrl(), ""];
   }
   // スポーツセンターのページから指定された月のスケジュールのURLを取得する
-  let url = URL[place]
+  let url = URL_RELATED_DATA[place][0]
   let response = UrlFetchApp.fetch(url);
   let content = response.getContentText("utf-8");
   // スケジュールに関する部分のみ取得する
-  let text = Parser.data(content).from('p-blogParts post_content').to('</div>').iterate();
+  let text = Parser.data(content).from(URL_RELATED_DATA[place][2]).to(URL_RELATED_DATA[place][3]).iterate();
   // スケジュールの月とlinkを取得する
-  let scheduleInfo = extractScheduleInfoFromString(text, month)
-  if (scheduleInfo.length == 0){
+  let scheduleLink = extractScheduleInfoFromString(text, month, new RegExp(URL_RELATED_DATA[place][1],"g"))
+  if (scheduleLink == ""){
     return ["noImage", "選択された月の予定表はまだありません。"]
-  };
-  var scheduleURL = scheduleInfo[0].link
+  }
+  if (place == "青葉"){ // 青葉区のみ予定表のurlが相対的パスであった。
+    scheduleLink = "https://information.konamisportsclub.jp" + scheduleLink
+  }
   // pdfをダウンロードして画像ファイルして保存する
-  var pdfFile = downloadPdfFromUrl(scheduleURL)
-  imageURL = convertPdfToImages(pdfFile)
-  saveImagesToDrive(imageURL, imageName)
+  var pdfFile = downloadPdfFromUrl(scheduleLink)
+  imageUrl = convertPdfToImages(pdfFile)
+  saveImagesToDrive(imageUrl, imageName)
   // pdfデータを削除する
   deletePdfFile(pdfFile)
   image = FOLDER.getFilesByName(imageName);
@@ -164,8 +153,8 @@ function convertPdfToImages(file) {
   }
 }
 
-function saveImagesToDrive(imageURL, imageName) {
-  let response = UrlFetchApp.fetch(imageURL);
+function saveImagesToDrive(imageUrl, imageName) {
+  let response = UrlFetchApp.fetch(imageUrl);
   let blob = response.getBlob();
   let file = FOLDER.createFile(blob).setName(imageName);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -174,3 +163,23 @@ function saveImagesToDrive(imageURL, imageName) {
 function deletePdfFile(file){
   file.setTrashed(true);
 }
+
+
+
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用予定表<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月個人利用スケジュール<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人スケジュール\\(PDF\\)<\\/a
+// <a\\s[^>]*href="([^"]*)"[^>]*><span>\\d{4}年([0-9]+)月個人利用日程表<\\/span>
+// <a\\s[^>]*href="([^"]*)"[^>]*>☝([0-9]+)月の予定はこちら<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月度個人利用.*<\\/a>
+// <a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月予定<\\/a>
+

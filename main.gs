@@ -1,8 +1,8 @@
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty("CHANNEL_ACCESS_TOKEN")
-const PLACE = ["鶴見","神奈川","中","南","港南","保土ケ谷","旭","磯子","金沢","港北","緑","都筑","戸塚","栄","泉","瀬谷"]
+const PLACE = ["港南", "金沢", "戸塚", "栄", "鶴見", "都筑", "泉", "中", "磯子", "緑", "旭", "瀬谷", "青葉", "南"]
 const DEFAULT_PLACE = "栄"
 
-const sheetId = 'SPREAD_SHEET_ID';
+const sheetId = PropertiesService.getScriptProperties().getProperty('SPREAD_SHEET_ID');
 const sheetName = 'シート1';
 const sh = SpreadsheetApp.openById(sheetId).getSheetByName(sheetName);
 function logger(e) {
@@ -87,7 +87,8 @@ function getMonthAndPlace(message) {
   if(PLACE.includes(all_msg[1])){
     msgInfo.place = all_msg[1];
   }else{
-    msgInfo.error_message += "区の指定が不適切です。また、西区、青葉区は対象外です。\n"
+    // 西区は個人利用ができず、残り3つはスクレイピングできないため対象外。
+    msgInfo.error_message += "区の指定が不適切です。また、西区、神奈川区、港北区、保土ヶ谷区は対象外です。\n"
   }
   return msgInfo;
 }
