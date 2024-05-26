@@ -18,121 +18,145 @@ const URL_RELATED_DATA ={
   "青葉":['https://information.konamisportsclub.jp/trust/aoba/','<a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月度個人利用.*<\\/a>','id="tabs-schedule"','</div>'],
   "南":['https://www.yokohama-minamisc.jp/personal','<a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月予定<\\/a>','entry-content','</div>'],
 }
+
+/**
+ * 入力規則に沿うかを確認し、検索する年と月と場所を返します。
+ * @param text 選択された範囲のhtmlの文章
+ * @param searched_month 検索する月
+ * @param pattern pdfのlinkと何月用かを探す正規表現
+ * @return link
+ */
 function extractScheduleInfoFromString(text, searched_month, pattern) {
-  var match;
+  let match;
   // 全角数字もしくは全角括弧を半角に変換する
   text = text[0].replace(/[０-９（）]/g, function(s) {
-    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);  // ASCIIコード分だけずらす
   });
-  // パターンにマッチし、月が合うUrlを取得
+  // パターンマッチし、探している月のURLを取得
+  // match[1]: link
+  // match[2]: 月
   while (match = pattern.exec(text)) {
-    let link = match[1]; // リンクを取得
     if (match[2] == searched_month){
-      // matches.push({ month: month, link: link }); // 月とリンクを配列に追加
+      let link = match[1]
       return link
     }
   }
   return ""
 }
 
+/**
+ * 予定表の画像をURLを返す。
+ * @params year 検索する予定表の年
+ * @params month　検索する予定表の月
+ * @params place 検索する予定表のスポーツセンター
+ * @return [url,error_message]   予定表の画像のURLとエラーメッセージ
+ */
 function getScheduleImageUrl(year,month, place){
-  // 画像がすでに存在しているかを確認して存在している場合にはその画像を返す
+  // 画像がすでに存在しているかを確認して存在している場合にはその画像を返す // 
   let imageName = `${year}-${month}-${place}.png`
   let image = FOLDER.getFilesByName(imageName);
   if(image.hasNext()){
     return [image.next().getDownloadUrl(), ""];
   }
-  // スポーツセンターのページから指定された月のスケジュールのURLを取得する
+  // スポーツセンターのページから指定された月のスケジュールのURLを取得する // 
   let url = URL_RELATED_DATA[place][0]
   let response = UrlFetchApp.fetch(url);
   let content = response.getContentText("utf-8");
   // スケジュールに関する部分のみ取得する
   let text = Parser.data(content).from(URL_RELATED_DATA[place][2]).to(URL_RELATED_DATA[place][3]).iterate();
-  // スケジュールの月とlinkを取得する
+  // スケジュールのlinkを取得する
   let scheduleLink = extractScheduleInfoFromString(text, month, new RegExp(URL_RELATED_DATA[place][1],"g"))
-  if (scheduleLink == ""){
+  if (scheduleLink == ""){ // linkが見つからない時にエラーを返す
     return ["noImage", "選択された月の予定表はまだありません。"]
   }
   if (place == "青葉"){ // 青葉区のみ予定表のurlが相対的パスであった。
     scheduleLink = "https://information.konamisportsclub.jp" + scheduleLink
   }
-  // pdfをダウンロードして画像ファイルして保存する
-  var pdfFile = downloadPdfFromUrl(scheduleLink)
-  imageUrl = convertPdfToImages(pdfFile)
+
+  // PDFをダウンロードして画像ファイルして保存する // 
+  // PDFのblob型で取得
+  let blob = getScheduleBlob(scheduleLink)
+  // PDf.coを使用してPDFを画像ファイルに変換して画像ファイルのURLを取得
+  imageUrl = convertPdfToImages(blob)
   saveImagesToDrive(imageUrl, imageName)
-  // pdfデータを削除する
-  deletePdfFile(pdfFile)
   image = FOLDER.getFilesByName(imageName);
-  // logger(image)
   return [image.next().getDownloadUrl(),""];
 }
 
-function downloadPdfFromUrl(url) {
+/**
+ * 予定表のblob型を返す関数
+ * @params url ダウンロードする予定表のURL
+ * @returns 予定表のBlob型
+ */
+function getScheduleBlob(url) {
   var response = UrlFetchApp.fetch(url);
   var blob = response.getBlob();
-  var file = FOLDER.createFile(blob).setName('sample.pdf');
-  Logger.log('File saved to Google Drive with ID: ' + file.getId());
-  return file
+  return blob
 }
 
-function uploadPdfToPdfCo(blob) {
-  var apiKey = API_KEY; // PDF.coのAPIキー
-  var url = 'https://api.pdf.co/v1/file/upload/get-presigned-url?name=sample.pdf&contenttype=application/pdf';
+/**
+ * pdfを画像に変換するPDF.coにPDFをアップロードする関数。
+ * pdfを直接画像に変換できると思っていたが、できなかったためこのようにしている。
+ * @params blob
+ * @params API_KEY PDF.co用のapi key
+ * @returns fileUrl
+ */
+function uploadPdfToPdfCo(blob, apiKey) {
+  let url = 'https://api.pdf.co/v1/file/upload/get-presigned-url?name=sample.pdf&contenttype=application/pdf';
   
-  // プレサインURLを取得するリクエスト
-  var options = {
+  // プレサインURLを取得するリクエスト // 
+  let options = {
     'method': 'GET',
     'headers': {
       'x-api-key': apiKey
     }
   };
   
-  var response = UrlFetchApp.fetch(url, options);
-  var jsonResponse = JSON.parse(response.getContentText());
+  let response = UrlFetchApp.fetch(url, options);
+  let jsonResponse = JSON.parse(response.getContentText());
   
   if (jsonResponse.error) {
-    Logger.log('Error: ' + jsonResponse.message);
-    return null;
+    throw new Error('Error: ' + jsonResponse.message);
   }
   
-  var presignedUrl = jsonResponse.presignedUrl;
-  var fileUrl = jsonResponse.url;
+  let presignedUrl = jsonResponse.presignedUrl;
+  let fileUrl = jsonResponse.url;
   
-  // ファイルをアップロードするリクエスト
-  var uploadOptions = {
+  // ファイルをアップロードするリクエスト // 
+  let uploadOptions = {
     'method': 'PUT',
     'contentType': 'application/pdf',
     'payload': blob.getBytes()
   };
   
-  var uploadResponse = UrlFetchApp.fetch(presignedUrl, uploadOptions);
+  let uploadResponse = UrlFetchApp.fetch(presignedUrl, uploadOptions);
   
   if (uploadResponse.getResponseCode() != 200) {
-    Logger.log('Error uploading file: ' + uploadResponse.getContentText());
-    return null;
+    throw new Error(`${uploadResponse.getResponseCode()}エラーが発生しました。`);
   }
   
   return fileUrl;
 }
 
-function convertPdfToImages(file) {
-  // var file = FOLDER.getFileById(fileId);
-  var blob = file.getBlob();
-  
-  var apiKey = API_KEY
-  // ファイルをPDF.coにアップロード
-  var fileUrl = uploadPdfToPdfCo(blob);
+/**
+ * 予定表のblob型を受け取ってPDF.coを使用して画像に変換し、画像を返す関数
+ * @params blob 予定表のblob型(pdf形式)
+ * @returns imageUrl 画像のURLを返す
+ */
+function convertPdfToImages(blob) {
+  let apiKey = API_KEY
+  // ファイルをPDF.coにアップロード // 
+  let fileUrl = uploadPdfToPdfCo(blob, API_KEY);
   if (!fileUrl) {
-    Logger.log('Failed to upload file.');
-    return;
+    throw new Error('Failed to upload file.');
   }
-  var url = 'https://api.pdf.co/v1/pdf/convert/to/png';
-  var payload = {
+  let url = 'https://api.pdf.co/v1/pdf/convert/to/png';
+  let payload = {
       'url': fileUrl,
       'async': false
     };
     
-  var options = {
+  let options = {
     'method': 'post',
     'contentType': 'application/json',
     'headers': {
@@ -141,45 +165,27 @@ function convertPdfToImages(file) {
     'payload': JSON.stringify(payload)
   };
   
-  var response = UrlFetchApp.fetch(url, options);
-  var jsonResponse = JSON.parse(response.getContentText());
+  let response = UrlFetchApp.fetch(url, options);
+  let jsonResponse = JSON.parse(response.getContentText());
   
   if (jsonResponse.error == false) {
-    var images = jsonResponse.urls;
-    var image = images[0];
-    return image
+    let images = jsonResponse.urls;
+    let imageUrl = images[0];
+    return imageUrl
   } else {
-    Logger.log('Error: ' + jsonResponse.message);
+    throw new Error('Error: ' + jsonResponse.message);
   }
 }
 
+/**
+ * 画像のURLをGoogleDriveに保存する
+ * @params imageUrl　画像のURL
+ * @params imageName 保存する際の画像の名前
+ */
 function saveImagesToDrive(imageUrl, imageName) {
   let response = UrlFetchApp.fetch(imageUrl);
   let blob = response.getBlob();
   let file = FOLDER.createFile(blob).setName(imageName);
+  // 共有の設定を全員にする
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 }
-
-function deletePdfFile(file){
-  file.setTrashed(true);
-}
-
-
-
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用予定表<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月個人利用スケジュール<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人スケジュール\\(PDF\\)<\\/a
-// <a\\s[^>]*href="([^"]*)"[^>]*><span>\\d{4}年([0-9]+)月個人利用日程表<\\/span>
-// <a\\s[^>]*href="([^"]*)"[^>]*>☝([0-9]+)月の予定はこちら<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>([0-9]+)月の個人利用スケジュール\\(PDF\\)<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月度個人利用.*<\\/a>
-// <a\\s[^>]*href="([^"]*)"[^>]*>\\d{4}年([0-9]+)月予定<\\/a>
-
