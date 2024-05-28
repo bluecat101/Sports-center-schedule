@@ -10,9 +10,12 @@
 ## アプリについて
 横浜市のスポーツセンターの個人利用の予定表をLINEを通して取得できるアプリ
 LINEで友達登録し、「区」と取得する予定表の「月」を打つことで予定表を取得する。
-![実行画面](https://i.gyazo.com/b0bfd9f7b72a3f482d6fc8d10fc64be9.jpg)
-こちらから追加できます。
-![QRコード](https://i.gyazo.com/3587dad2fefc664c860ef8bfe768541a.jpg)
+<!--[実行画面]() -->
+<img src="https://i.gyazo.com/b0bfd9f7b72a3f482d6fc8d10fc64be9.jpg" width="300" alt = "実行画面">
+
+こちらから追加できます。↓
+
+<img src="https://i.gyazo.com/3587dad2fefc664c860ef8bfe768541a.jpg" width="300" alt = "QRコード">
 
 ## 環境
 |言語・フレームワーク・ライブラリ|バージョン|
