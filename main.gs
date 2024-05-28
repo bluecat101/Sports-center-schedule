@@ -4,9 +4,9 @@ const NOT_APPLICABLE_PLACE = ["西", "神奈川", "港北", "保土ヶ谷"]
 const DEFAULT_PLACE = "栄"
 
 // エラーをスプレッドシートに記録するための準備 // 
-const sheetId = PropertiesService.getScriptProperties().getProperty('SPREAD_SHEET_ID');
-const sheetName = 'シート1';
-const sh = SpreadsheetApp.openById(sheetId).getSheetByName(sheetName);
+const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREAD_SHEET_ID');
+const SHEET_NAME = PropertiesService.getScriptProperties().getProperty('SHEET_NAME');
+const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
 
 /**
  * エラーが発生した時にエラーメッセージをスプレッドシートに記録する
