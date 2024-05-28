@@ -30,6 +30,7 @@ LINEで友達登録し、「区」と取得する予定表の「月」を打つ�
 ├── getSchedule.gs
 ├── main.gs
 ├── README.md
+├── appsscript.json
 └── .gitignore
 </pre>
 
