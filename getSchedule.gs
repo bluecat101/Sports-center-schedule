@@ -1,4 +1,5 @@
-const API_KEY = PropertiesService.getScriptProperties().getProperty("API_KEY_FOR_pdf.co")
+// const API_KEY = PropertiesService.getScriptProperties().getProperty("API_KEY_FOR_pdf.co")
+const API_KEY = PropertiesService.getScriptProperties().getProperty("API_KEY_FOR_CloudConvert")
 const FOLDER = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty("FOLDER_ID"))
 
 // 各スポーツセンターのURL、予定表のURLを取得する正規表現、予定表のURLが存在する範囲の最初と最後の文字
@@ -74,108 +75,28 @@ function getScheduleImageUrl(year,month, place){
   }
 
   // PDFをダウンロードして画像ファイルして保存する // 
-  // PDFのblob型で取得
-  let blob = getScheduleBlob(scheduleLink)
-  // PDf.coを使用してPDFを画像ファイルに変換して画像ファイルのURLを取得
-  imageUrl = convertPdfToImages(blob)
+  pdfFile = downloadPdf(scheduleLink);
+  //  cloudconvertを使ってPDFファイルをongに変換する
+  imageUrl = convertPdfToImageWithCloudConvert(pdfFile)
   saveImagesToDrive(imageUrl, imageName)
+  // PDFファイルを削除する
+  pdfFile.setTrashed(true)
   image = FOLDER.getFilesByName(imageName);
   return [image.next().getDownloadUrl(),""];
 }
 
 /**
- * 予定表のblob型を返す関数
- * @params url ダウンロードする予定表のURL
- * @returns 予定表のBlob型
+ * googleDriveに予定表をダウンロードしてそのファイルパスを返す関数
+ * @params scheduleLink 予定表のurl
+ * @returns file pdfのファイル
  */
-function getScheduleBlob(url) {
-  var response = UrlFetchApp.fetch(url);
-  var blob = response.getBlob();
-  return blob
+function downloadPdf(scheduleLink) {
+  var blob = UrlFetchApp.fetch(scheduleLink).getAs('application/pdf');
+  // Googleドライブへ保存 (ルートディレクトリに保存)
+  const file = FOLDER.createFile(blob);
+  return file;
 }
 
-/**
- * pdfを画像に変換するPDF.coにPDFをアップロードする関数。
- * pdfを直接画像に変換できると思っていたが、できなかったためこのようにしている。
- * @params blob
- * @params API_KEY PDF.co用のapi key
- * @returns fileUrl
- */
-function uploadPdfToPdfCo(blob, apiKey) {
-  let url = 'https://api.pdf.co/v1/file/upload/get-presigned-url?name=sample.pdf&contenttype=application/pdf';
-  
-  // プレサインURLを取得するリクエスト // 
-  let options = {
-    'method': 'GET',
-    'headers': {
-      'x-api-key': apiKey
-    }
-  };
-  
-  let response = UrlFetchApp.fetch(url, options);
-  let jsonResponse = JSON.parse(response.getContentText());
-  
-  if (jsonResponse.error) {
-    throw new Error('Error: ' + jsonResponse.message);
-  }
-  
-  let presignedUrl = jsonResponse.presignedUrl;
-  let fileUrl = jsonResponse.url;
-  
-  // ファイルをアップロードするリクエスト // 
-  let uploadOptions = {
-    'method': 'PUT',
-    'contentType': 'application/pdf',
-    'payload': blob.getBytes()
-  };
-  
-  let uploadResponse = UrlFetchApp.fetch(presignedUrl, uploadOptions);
-  
-  if (uploadResponse.getResponseCode() != 200) {
-    throw new Error(`${uploadResponse.getResponseCode()}エラーが発生しました。`);
-  }
-  
-  return fileUrl;
-}
-
-/**
- * 予定表のblob型を受け取ってPDF.coを使用して画像に変換し、画像を返す関数
- * @params blob 予定表のblob型(pdf形式)
- * @returns imageUrl 画像のURLを返す
- */
-function convertPdfToImages(blob) {
-  let apiKey = API_KEY
-  // ファイルをPDF.coにアップロード // 
-  let fileUrl = uploadPdfToPdfCo(blob, API_KEY);
-  if (!fileUrl) {
-    throw new Error('Failed to upload file.');
-  }
-  let url = 'https://api.pdf.co/v1/pdf/convert/to/png';
-  let payload = {
-      'url': fileUrl,
-      'async': false
-    };
-    
-  let options = {
-    'method': 'post',
-    'contentType': 'application/json',
-    'headers': {
-      'x-api-key': apiKey
-    },
-    'payload': JSON.stringify(payload)
-  };
-  
-  let response = UrlFetchApp.fetch(url, options);
-  let jsonResponse = JSON.parse(response.getContentText());
-  
-  if (jsonResponse.error == false) {
-    let images = jsonResponse.urls;
-    let imageUrl = images[0];
-    return imageUrl
-  } else {
-    throw new Error('Error: ' + jsonResponse.message);
-  }
-}
 
 /**
  * 画像のURLをGoogleDriveに保存する
@@ -188,4 +109,137 @@ function saveImagesToDrive(imageUrl, imageName) {
   let file = FOLDER.createFile(blob).setName(imageName);
   // 共有の設定を全員にする
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+}
+
+
+
+/**
+ * cloudconvertを使って、driveに保存されているPDFファイルをpngファイルに変化する
+ * １日25回程度が限度
+ * @params file Driveに保存されているPDFのファイル 
+ * @returns downloadUrl imageのURL
+ */
+function convertPdfToImageWithCloudConvert(file) {
+  // cloudconvertにjobが残っている可能性があるので全削除
+  deleteAllJobs()
+
+  // fileからblob型と名前を取得
+  var blob = file.getBlob();
+  var fileName = file.getName(); // PDFファイルの名前を取得
+
+  // PDFファイルをBase64エンコード
+  var pdfBase64 = Utilities.base64Encode(blob.getBytes());
+
+  // CloudConvertのジョブを作成するためのリクエスト
+  var url = 'https://api.cloudconvert.com/v2/jobs';
+
+  // CloudConvert APIのリクエストペイロード
+  var payload = {
+    "tasks": {
+      "import-1": {
+        "operation": "import/base64",
+        "filename": fileName, // ファイル名を指定
+        "file": pdfBase64
+      },
+      "convert-1": {
+        "operation": "convert",
+        "input": "import-1",
+        "output_format": "png"
+      },
+      "export-1": {
+        "operation": "export/url",
+        "input": "convert-1"
+      }
+    }
+  };
+
+  var options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'headers': {
+      'Authorization': 'Bearer ' + API_KEY
+    },
+    'payload': JSON.stringify(payload),
+  };
+
+  // CloudConvertジョブの作成
+  var response = UrlFetchApp.fetch(url, options);
+  var responseData = JSON.parse(response.getContentText());
+  var jobId = responseData.data.id;
+
+  // ジョブの完了を待つ
+  var jobStatusUrl = 'https://api.cloudconvert.com/v2/jobs/' + jobId;
+  var jobComplete = false;
+  var jobStatusResponse, jobStatusData, status;
+  while (!jobComplete) {
+    jobStatusResponse = UrlFetchApp.fetch(jobStatusUrl, {
+      'method': 'get',
+      'headers': {
+        'Authorization': 'Bearer ' + API_KEY
+      }
+    });
+    jobStatusData = JSON.parse(jobStatusResponse.getContentText());
+    status = jobStatusData.data.status;
+
+    if (status === 'finished') {
+      jobComplete = true;
+    } else if (status === 'error') {
+      Logger.log('Error: ' + jobStatusData.data.message);
+      return;
+    }
+
+    // 3秒待つ（ジョブの完了を待つための適切な待機時間）
+    Utilities.sleep(500);
+  }
+  // ジョブを削除する
+  deleteJob(jobId)
+
+  // 変換された画像のダウンロードURLを取得
+  var downloadUrl = jobStatusData.data.tasks.filter(function(task) {
+    return task.operation === 'export/url';
+  })[0].result.files[0].url;
+  return downloadUrl
+}
+
+
+
+/**
+ * cloudconvertのjobiを全て取得して全てのjobを削除する
+ */
+function deleteAllJobs() {
+  var apiKey = API_KEY; // cloudconvertのAPIキーをここに入力
+
+  // CloudConvertのすべてのジョブを取得するリクエスト
+  var url = 'https://api.cloudconvert.com/v2/jobs';
+
+  var options = {
+    'method': 'get',
+    'headers': {
+      'Authorization': 'Bearer ' + apiKey
+    }
+  };
+
+  // CloudConvertジョブの取得
+  var response = UrlFetchApp.fetch(url, options);
+  var responseData = JSON.parse(response.getContentText());
+
+  // 取得したすべてのジョブを削除する
+  responseData.data.forEach(function(job) {
+    deleteJob(job.id);
+  });
+}
+
+
+/**
+ * couldconvertのjobidを受け取って削除する
+ * @params jobid couldconvertのjobid
+ */
+function deleteJob(jobId){
+    var deleteUrl = 'https://api.cloudconvert.com/v2/jobs/' + jobId;
+    UrlFetchApp.fetch(deleteUrl, {
+      'method': 'delete',
+      'headers': {
+        'Authorization': 'Bearer ' + API_KEY
+      }
+    });
 }
