@@ -26,7 +26,7 @@ const URL_RELATED_DATA ={
  * @param pattern pdfのlinkと何月用かを探す正規表現
  * @return link
  */
-function extractScheduleInfoFromString(text, searched_month, pattern) {
+function _extractScheduleInfoFromString(text, searched_month, pattern) {
   let match;
   // 全角数字もしくは全角括弧を半角に変換する
   text = text[0].replace(/[０-９（）]/g, function(s) {
@@ -37,7 +37,7 @@ function extractScheduleInfoFromString(text, searched_month, pattern) {
   // match[2]: 月
   while (match = pattern.exec(text)) {
     if (match[2] == searched_month){
-      let link = match[1]
+      const link = match[1]
       return link
     }
   }
@@ -53,19 +53,19 @@ function extractScheduleInfoFromString(text, searched_month, pattern) {
  */
 function getScheduleImageUrl(year,month, place){
   // 画像がすでに存在しているかを確認して存在している場合にはその画像を返す // 
-  let imageName = `${year}-${month}-${place}.png`
-  let image = FOLDER.getFilesByName(imageName);
+  const imageName = `${year}-${month}-${place}.png`
+  const image = FOLDER.getFilesByName(imageName);
   if(image.hasNext()){
     return [image.next().getDownloadUrl(), ""];
   }
   // スポーツセンターのページから指定された月のスケジュールのURLを取得する // 
-  let url = URL_RELATED_DATA[place][0]
-  let response = UrlFetchApp.fetch(url);
-  let content = response.getContentText("utf-8");
+  const url = URL_RELATED_DATA[place][0]
+  const response = UrlFetchApp.fetch(url);
+  const content = response.getContentText("utf-8");
   // スケジュールに関する部分のみ取得する
-  let text = Parser.data(content).from(URL_RELATED_DATA[place][2]).to(URL_RELATED_DATA[place][3]).iterate();
+  const textIncludeSchedule = Parser.data(content).from(URL_RELATED_DATA[place][2]).to(URL_RELATED_DATA[place][3]).iterate();
   // スケジュールのlinkを取得する
-  let scheduleLink = extractScheduleInfoFromString(text, month, new RegExp(URL_RELATED_DATA[place][1],"g"))
+  let scheduleLink = _extractScheduleInfoFromString(textIncludeSchedule, month, new RegExp(URL_RELATED_DATA[place][1],"g"))
   if (scheduleLink == ""){ // linkが見つからない時にエラーを返す
     return ["noImage", "選択された月の予定表はまだありません。"]
   }
@@ -74,13 +74,12 @@ function getScheduleImageUrl(year,month, place){
   }
 
   // PDFをダウンロードして画像ファイルして保存する // 
-  pdfFile = downloadPdf(scheduleLink);
-  const imageFile = toImageFromPdf(pdfFile);
-  saveFileToDrive(imageFile, imageName)
+  const pdfFile = _downloadPdf(scheduleLink);
+  const imageFile = _toImageFromPdf(pdfFile);
+  const savedFile = _saveFileToDrive(imageFile, imageName)
   // PDFファイルを削除する
   pdfFile.setTrashed(true)
-  image = FOLDER.getFilesByName(imageName);
-  return [image.next().getDownloadUrl(),""];
+  return [savedFile.getDownloadUrl(),""];
 }
 
 /**
@@ -88,8 +87,8 @@ function getScheduleImageUrl(year,month, place){
  * @params scheduleLink 予定表のurl
  * @returns file pdfのファイル
  */
-function downloadPdf(scheduleLink) {
-  var blob = UrlFetchApp.fetch(scheduleLink).getAs('application/pdf');
+function _downloadPdf(scheduleLink) {
+  const blob = UrlFetchApp.fetch(scheduleLink).getAs('application/pdf');
   // Googleドライブへ保存 (ルートディレクトリに保存)
   const file = FOLDER.createFile(blob);
   return file;
@@ -100,11 +99,13 @@ function downloadPdf(scheduleLink) {
  * Fileのblobを用いてGoogleDriveに保存する
  * @params fileBlob fileのBlob
  * @params fileName 保存する際の画像の名前
+ * @return file
  */
-function saveFileToDrive(fileBlob, fileName) {
+function _saveFileToDrive(fileBlob, fileName) {
   const file = FOLDER.createFile(fileBlob).setName(fileName);
   // 共有の設定を全員にする
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file;
 }
 
 
@@ -113,7 +114,7 @@ function saveFileToDrive(fileBlob, fileName) {
  * @params pdfFile pdfのファイルオブジェクト
  * @return 画像ファイルのblob
  */
-function toImageFromPdf(pdfFile){
+function _toImageFromPdf(pdfFile){
   const tokenUrl = 'https://api.ilovepdf.com/v1/auth';
 
   // トークンの取得

@@ -13,7 +13,7 @@ const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
  * @params e エラーメッセージ
  */
 function logger(e) {
-  let lastRow = sh.getLastRow() + 1;
+  const lastRow = sh.getLastRow() + 1;
   sh.getRange(lastRow,1).setValue(new Date());
   sh.getRange(lastRow,2).setValue(e);
   sh.getRange(lastRow,3).setValue(e.stack);
@@ -26,15 +26,15 @@ function logger(e) {
  */
 function doPost(e) {
     /** パースされた受信データ */
-    let json = JSON.parse(e.postData.contents);
+    const json = JSON.parse(e.postData.contents);
     /** 返信するためのトークン取得 */
-    let reply_token = json.events[0].replyToken;
+    const reply_token = json.events[0].replyToken;
     /** 送信されたメッセージ */
-    let user_message = json.events[0].message.text;
+    const user_message = json.events[0].message.text;
     try {
         // 送信されたメッセージが入力規則に一致するかを確認
         /** 送信されたメッセージから月と場所を取得する */
-        let msgInfo = getMonthAndPlace(user_message);
+        let msgInfo = _getMonthAndPlace(user_message);
         if(msgInfo.error_message != ""){
           msgInfo.error_message += "以下のように入力してください。\n\
           ================\n\
@@ -46,7 +46,7 @@ function doPost(e) {
           return;
         }
         // 画像のURLとエラーメッセージを取得する
-        let imageInfo = getScheduleImageUrl(msgInfo.year,msgInfo.month, msgInfo.place)
+        const imageInfo = getScheduleImageUrl(msgInfo.year,msgInfo.month, msgInfo.place)
         if(imageInfo[1] != ""){ // エラー時
           msgInfo.error_message += imageInfo[1]
         }
@@ -71,14 +71,14 @@ function doPost(e) {
  * @param message 送信されたメッセージ
  * @return 年と月と場所のデータ
  */
-function getMonthAndPlace(message) {
-  let currentDate = new Date();
+function _getMonthAndPlace(message) {
+  const currentDate = new Date();
   msgInfo ={year:currentDate.getFullYear(),month:currentDate.getMonth() + 1, place:DEFAULT_PLACE,error_message:""}// 0 から 11 までの値なので、1 を加えて実際の月に変換
   // 入力された文字を取得
   /** 送信されたメッセージを分割した文字列 */
   let all_msg = message.split("\n");
-  let patternMonth = /^(1[0-2]|[1-9])月?$/;
-  let match = all_msg[0].match(patternMonth);
+  const patternMonth = /^(1[0-2]|[1-9])月?$/;
+  const match = all_msg[0].match(patternMonth);
   if(match){
     msgInfo.month = match[1] // match[1]に月の数字のみの部分が格納されている
   }else{
