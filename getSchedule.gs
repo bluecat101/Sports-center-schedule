@@ -1,4 +1,4 @@
-const FOLDER = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty("FOLDER_ID"))
+
 const API_KEY = PropertiesService.getScriptProperties().getProperty("API_KEY_I_LOVE_PDF");
 
 // 各スポーツセンターのURL、予定表のURLを取得する正規表現、予定表のURLが存在する範囲の最初と最後の文字

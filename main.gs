@@ -2,6 +2,9 @@ const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty
 const PLACE = ["港南", "金沢", "戸塚", "栄", "鶴見", "都筑", "泉", "中", "磯子", "緑", "旭", "瀬谷", "青葉", "南"]
 const NOT_APPLICABLE_PLACE = ["西", "神奈川", "港北", "保土ヶ谷"]
 
+/** 関連のデータを保存するフォルダ */
+const FOLDER = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty("FOLDER_ID"))
+
 // エラーをスプレッドシートに記録するための準備 // 
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREAD_SHEET_ID');
 const DEFAULT_PLACE = PropertiesService.getScriptProperties().getProperty('DEFAULT_SPORTS_CENTER');
