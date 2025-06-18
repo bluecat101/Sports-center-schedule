@@ -1,22 +1,22 @@
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty("CHANNEL_ACCESS_TOKEN")
 const PLACE = ["港南", "金沢", "戸塚", "栄", "鶴見", "都筑", "泉", "中", "磯子", "緑", "旭", "瀬谷", "青葉", "南"]
 const NOT_APPLICABLE_PLACE = ["西", "神奈川", "港北", "保土ヶ谷"]
-const DEFAULT_PLACE = "栄"
 
 // エラーをスプレッドシートに記録するための準備 // 
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREAD_SHEET_ID');
-const SHEET_NAME = PropertiesService.getScriptProperties().getProperty('SHEET_NAME');
-const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+const DEFAULT_PLACE = PropertiesService.getScriptProperties().getProperty('DEFAULT_SPORTS_CENTER');
 
 /**
  * エラーが発生した時にエラーメッセージをスプレッドシートに記録する
  * @params e エラーメッセージ
  */
 function logger(e) {
-  const lastRow = sh.getLastRow() + 1;
-  sh.getRange(lastRow,1).setValue(new Date());
-  sh.getRange(lastRow,2).setValue(e);
-  sh.getRange(lastRow,3).setValue(e.stack);
+  const SHEET_NAME_LOG = PropertiesService.getScriptProperties().getProperty('SHEET_NAME');
+  const sheet_log = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME_LOG);
+  const lastRow = sheet_log.getLastRow() + 1;
+  sheet_log.getRange(lastRow,1).setValue(new Date());
+  sheet_log.getRange(lastRow,2).setValue(e);
+  sheet_log.getRange(lastRow,3).setValue(e.stack);
 }
 
 
