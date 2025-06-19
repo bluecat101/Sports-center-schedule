@@ -9,9 +9,10 @@ function analyzeSchedule(scheduleQuery) {
   if (existingJsonFile) return existingJsonFile.getBlob() ;
 
   const pdfFileName = getBaseFileName(scheduleQuery) + ".pdf";
-  const pdfFile = getOrDownloadPdf(scheduleQuery.place, pdfFileName);
+  const pdfFile = getOrDownloadPdf(scheduleQuery, pdfFileName);
 
-  const schedule = read_schedule_from_pdf(scheduleQuery.place, pdfFile);
+  const schedule = read_schedule_from_pdf(scheduleQuery.place, pdfFile.getBlob());
+  Logger.log(schedule)
   return saveScheduleForFolder(schedule, jsonFileName);
 }
 
@@ -30,12 +31,21 @@ function saveScheduleForFolder(srtJson, fileName){
  * 日付を指定してその日の予定を返す。
  */
 function fetchScheduleByDate(scheduleQuery, date){
-  const pdfFile = analyze_schedule_by_date(scheduleQuery)
-  const text = pdfFile.getDataAsString('utf8');
+  const jsonBlob = analyzeSchedule(scheduleQuery)
+  const text = jsonBlob.getDataAsString('utf8');
   const json = JSON.parse(text);
   if(!(date in json)){
     return "日付が範囲外です。";
   }
-  return json.date;
-  
+  return json[date];
 }
+
+
+function test(){
+scheduleQuery["month"] = "6";
+scheduleQuery["year"] = "2025";
+scheduleQuery["place"] = "栄";
+date = "10";
+analyzeSchedule(scheduleQuery) ;
+Logger.log(fetchScheduleByDate(scheduleQuery, date));
+} 

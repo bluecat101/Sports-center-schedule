@@ -10,9 +10,9 @@ function getBaseFileName(scheduleQuery) {
 }
 
 const scheduleQuery = {
-  place: null,
-  year: null,
-  month: null
+  "place": null,
+  "year": null,
+  "month": null
 }
 
 /**

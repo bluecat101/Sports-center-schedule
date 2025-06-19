@@ -21,7 +21,9 @@ const URL_RELATED_DATA ={
 /**
  * 予定表を取得しダウンロードする
  */
-function fetchScheduleLink(place){
+function fetchScheduleLink(scheduleQuery){
+  const place = scheduleQuery.place
+  const month = scheduleQuery.month
   // スポーツセンターのページから指定された月のスケジュールのURLを取得する // 
   const url = URL_RELATED_DATA[place][0]
   const response = UrlFetchApp.fetch(url);
@@ -70,16 +72,16 @@ function _extractScheduleInfoFromString(text, searched_month, pattern) {
 
 /**
  * PDFファイルを取得。存在しない場合はダウンロードして返す
- * @param {string} place
+ * @param {dict} scheduleQuery
  * @param {string} fileName
  * @returns {File} - Google DriveのFileオブジェクト
  */
-function getOrDownloadPdf(place, fileName) {
+function getOrDownloadPdf(scheduleQuery, fileName) {
   const files = FOLDER.getFilesByName(fileName);
   if (files.hasNext()) {
     return files.next();
   }
-  const scheduleLink = fetchScheduleLink(place);
+  const scheduleLink = fetchScheduleLink(scheduleQuery);
   return downloadPdf(scheduleLink, fileName);
 }
 
