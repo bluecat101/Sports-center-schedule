@@ -51,13 +51,46 @@ function _extractScheduleInfoFromString(text, searched_month, pattern) {
  * @params place 検索する予定表のスポーツセンター
  * @return [url,error_message]   予定表の画像のURLとエラーメッセージ
  */
-function getScheduleImageUrl(year,month, place){
+function getScheduleImageUrl(year, month, place){
+
+  const imageName = getBaseFileName(year, month, place) + ".png"
+  // const pdfFile = getOrDownloadPdf(place, fileName)
   // 画像がすでに存在しているかを確認して存在している場合にはその画像を返す // 
-  const imageName = `${year}-${month}-${place}.png`
   const image = FOLDER.getFilesByName(imageName);
   if(image.hasNext()){
     return [image.next().getDownloadUrl(), ""];
   }
+  // // スポーツセンターのページから指定された月のスケジュールのURLを取得する // 
+  // const url = URL_RELATED_DATA[place][0]
+  // const response = UrlFetchApp.fetch(url);
+  // const content = response.getContentText("utf-8");
+  // // スケジュールに関する部分のみ取得する
+  // const textIncludeSchedule = Parser.data(content).from(URL_RELATED_DATA[place][2]).to(URL_RELATED_DATA[place][3]).iterate();
+  // // スケジュールのlinkを取得する
+  // let scheduleLink = _extractScheduleInfoFromString(textIncludeSchedule, month, new RegExp(URL_RELATED_DATA[place][1],"g"))
+  // if (scheduleLink == ""){ // linkが見つからない時にエラーを返す
+  //   return ["noImage", "選択された月の予定表はまだありません。"]
+  // }
+  // if (place == "青葉"){ // 青葉区のみ予定表のurlが相対的パスであった。
+  //   scheduleLink = "https://information.konamisportsclub.jp" + scheduleLink
+  // }
+
+  // // PDFをダウンロードして画像ファイルして保存する // 
+  const scheduleLink = fetchScheduleLink(place);
+  const pdfFileName = getBaseFileName(year, month, place) + ".pdf"
+  const pdfFile = _downloadPdf(scheduleLink, pdfFileName);
+  // const pdfFile = fetchSchedule();
+  const imageFile = _toImageFromPdf(pdfFile);
+  const savedFile = _saveFileToDrive(imageFile, imageName)
+  // PDFファイルを削除する
+  pdfFile.setTrashed(true)
+  return [savedFile.getDownloadUrl(),""];
+}
+
+/**
+ * 予定表を取得しダウンロードする
+ */
+function fetchScheduleLink(place){
   // スポーツセンターのページから指定された月のスケジュールのURLを取得する // 
   const url = URL_RELATED_DATA[place][0]
   const response = UrlFetchApp.fetch(url);
@@ -72,14 +105,7 @@ function getScheduleImageUrl(year,month, place){
   if (place == "青葉"){ // 青葉区のみ予定表のurlが相対的パスであった。
     scheduleLink = "https://information.konamisportsclub.jp" + scheduleLink
   }
-
-  // PDFをダウンロードして画像ファイルして保存する // 
-  const pdfFile = _downloadPdf(scheduleLink);
-  const imageFile = _toImageFromPdf(pdfFile);
-  const savedFile = _saveFileToDrive(imageFile, imageName)
-  // PDFファイルを削除する
-  pdfFile.setTrashed(true)
-  return [savedFile.getDownloadUrl(),""];
+  return scheduleLink;
 }
 
 /**
@@ -87,8 +113,10 @@ function getScheduleImageUrl(year,month, place){
  * @params scheduleLink 予定表のurl
  * @returns file pdfのファイル
  */
-function _downloadPdf(scheduleLink) {
+function _downloadPdf(scheduleLink, fileName) {
   const blob = UrlFetchApp.fetch(scheduleLink).getAs('application/pdf');
+  // ファイル名を設定する
+  blob.setName(fileName);
   // Googleドライブへ保存 (ルートディレクトリに保存)
   const file = FOLDER.createFile(blob);
   return file;
