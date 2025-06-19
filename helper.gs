@@ -15,19 +15,12 @@ const scheduleQuery = {
   month: null
 }
 
-
-
 /**
- * PDFファイルを取得。存在しない場合はダウンロードして返す
- * @param {string} place
+ * 指定ファイル名のファイルを取得（存在しない場合はnull）
  * @param {string} fileName
- * @returns {File} - Google DriveのFileオブジェクト
+ * @returns {File|null}
  */
-function getOrDownloadPdf(place, fileName) {
+function getFileBlobIfExists(fileName) {
   const files = FOLDER.getFilesByName(fileName);
-  if (files.hasNext()) {
-    return files.next();
-  }
-  const scheduleLink = fetchScheduleLink(place);
-  return _downloadPdf(scheduleLink, fileName);
+  return files.hasNext() ? files.next(): null;
 }

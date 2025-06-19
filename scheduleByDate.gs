@@ -5,8 +5,8 @@
  */
 function analyzeSchedule(scheduleQuery) {
   const jsonFileName = getBaseFileName(scheduleQuery) + ".json";
-  const existingJson = getFileBlobIfExists(jsonFileName);
-  if (existingJson) return existingJson;
+  const existingJsonFile = getFileBlobIfExists(jsonFileName);
+  if (existingJsonFile) return existingJsonFile.getBlob() ;
 
   const pdfFileName = getBaseFileName(scheduleQuery) + ".pdf";
   const pdfFile = getOrDownloadPdf(scheduleQuery.place, pdfFileName);
@@ -14,18 +14,6 @@ function analyzeSchedule(scheduleQuery) {
   const schedule = read_schedule_from_pdf(scheduleQuery.place, pdfFile);
   return saveScheduleForFolder(schedule, jsonFileName);
 }
-
-/**
- * 指定ファイル名のBlobを取得（存在しない場合はnull）
- * @param {string} fileName
- * @returns {Blob|null}
- */
-function getFileBlobIfExists(fileName) {
-  const files = FOLDER.getFilesByName(fileName);
-  return files.hasNext() ? files.next().getBlob() : null;
-}
-
-
 
 /**
  * @params strJson {str}: str型のjson
